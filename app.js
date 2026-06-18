@@ -881,8 +881,12 @@ function loadLevel(index) {
   }
 
   saveGame();
+
+requestAnimationFrame(() => {
   resizeCanvas();
   updateCamera();
+  drawLevel();
+});
 }
 
 function resetStageEffects() {
@@ -901,16 +905,22 @@ function resetStageEffects() {
 }
 
 function resizeCanvas() {
-  const isMobile = window.innerWidth <= 768;
+  const rect = stageWrap.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  if (isMobile) {
-    canvas.width = 720;
-    canvas.height = 980;
-    stageWrap.classList.add("darkRoom");
-  } else {
-    canvas.width = 1100;
-    canvas.height = 650;
-  }
+  const cssWidth = Math.max(280, Math.floor(rect.width));
+  const cssHeight = Math.max(280, Math.floor(rect.height));
+
+  canvas.width = Math.floor(cssWidth * dpr);
+  canvas.height = Math.floor(cssHeight * dpr);
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+
+  canvas.logicalWidth = cssWidth;
+  canvas.logicalHeight = cssHeight;
 }
 
 function showMessage(text, time = 1600) {
@@ -1256,14 +1266,17 @@ function intersects(a, b) {
 }
 
 function updateCamera() {
-  const targetX = player.x + player.size / 2 - canvas.width / 2;
-  const targetY = player.y + player.size / 2 - canvas.height / 2;
+  const viewWidth = canvas.logicalWidth || canvas.width;
+  const viewHeight = canvas.logicalHeight || canvas.height;
+
+  const targetX = player.x + player.size / 2 - viewWidth / 2;
+  const targetY = player.y + player.size / 2 - viewHeight / 2;
 
   camera.x += (targetX - camera.x) * 0.12;
   camera.y += (targetY - camera.y) * 0.12;
 
-  camera.x = clamp(camera.x, 0, Math.max(0, activeLevel.width - canvas.width));
-  camera.y = clamp(camera.y, 0, Math.max(0, activeLevel.height - canvas.height));
+  camera.x = clamp(camera.x, 0, Math.max(0, activeLevel.width - viewWidth));
+  camera.y = clamp(camera.y, 0, Math.max(0, activeLevel.height - viewHeight));
 }
 
 function clamp(value, min, max) {
@@ -1271,7 +1284,10 @@ function clamp(value, min, max) {
 }
 
 function drawLevel() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const viewWidth = canvas.logicalWidth || canvas.width;
+  const viewHeight = canvas.logicalHeight || canvas.height;
+
+  ctx.clearRect(0, 0, viewWidth, viewHeight);
 
   drawBackground();
   drawMaze();
@@ -1300,13 +1316,16 @@ function toScreenY(y) {
 }
 
 function drawBackground() {
+  const viewWidth = canvas.logicalWidth || canvas.width;
+  const viewHeight = canvas.logicalHeight || canvas.height;
+
   const gradient = ctx.createRadialGradient(
-    canvas.width / 2,
-    canvas.height / 2,
+    viewWidth / 2,
+    viewHeight / 2,
     80,
-    canvas.width / 2,
-    canvas.height / 2,
-    canvas.width * 0.72
+    viewWidth / 2,
+    viewHeight / 2,
+    viewWidth * 0.72
   );
 
   gradient.addColorStop(0, "#151515");
@@ -1314,16 +1333,19 @@ function drawBackground() {
   gradient.addColorStop(1, "#020202");
 
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, viewWidth, viewHeight);
 }
 
 function drawMaze() {
   const tile = activeLevel.tile;
 
   const startCol = Math.floor(camera.x / tile) - 1;
-  const endCol = Math.ceil((camera.x + canvas.width) / tile) + 1;
   const startRow = Math.floor(camera.y / tile) - 1;
-  const endRow = Math.ceil((camera.y + canvas.height) / tile) + 1;
+  const viewWidth = canvas.logicalWidth || canvas.width;
+  const viewHeight = canvas.logicalHeight || canvas.height;
+
+  const endCol = Math.ceil((camera.x + viewWidth) / tile) + 1;
+  const endRow = Math.ceil((camera.y + viewHeight) / tile) + 1;
 
   for (let row = startRow; row <= endRow; row++) {
     for (let col = startCol; col <= endCol; col++) {
@@ -1355,6 +1377,8 @@ function drawMaze() {
 
 function drawAmbientMarks() {
   const seed = activeLevel.config.seed || 1;
+  const viewWidth = canvas.logicalWidth || canvas.width;
+  const viewHeight = canvas.logicalHeight || canvas.height;
 
   ctx.save();
 
@@ -1365,7 +1389,7 @@ function drawAmbientMarks() {
     const x = toScreenX(worldX);
     const y = toScreenY(worldY);
 
-    if (x < -80 || y < -80 || x > canvas.width + 80 || y > canvas.height + 80) {
+    if (x < -80 || y < -80 || x > viewWidth + 80 || y > viewHeight + 80) {
       continue;
     }
 
@@ -1507,10 +1531,11 @@ function drawLights() {
 
   const softDarkness = Math.max(0.11, darkness * 0.34);
 
-  ctx.fillStyle = `rgba(0,0,0,${softDarkness + flicker * 0.35})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const viewWidth = canvas.logicalWidth || canvas.width;
+  const viewHeight = canvas.logicalHeight || canvas.height;
 
-  
+  ctx.fillStyle = `rgba(0,0,0,${softDarkness + flicker * 0.35})`;
+  ctx.fillRect(0, 0, viewWidth, viewHeight);
 
   ctx.restore();
 
@@ -1525,7 +1550,8 @@ function drawCornerEyes() {
   const t = performance.now();
   const pulse = 0.28 + Math.sin(t * 0.005) * 0.12;
 
-  const x = canvas.width - 130;
+  const viewWidth = canvas.logicalWidth || canvas.width;
+  const x = viewWidth - 130;
   const y = 46;
 
   ctx.globalAlpha = 0.55 + pulse;
@@ -1554,13 +1580,16 @@ function drawCornerEyes() {
 function drawNoise() {
   const amount = screenNoise > 0 ? 80 : 18;
 
+  const viewWidth = canvas.logicalWidth || canvas.width;
+  const viewHeight = canvas.logicalHeight || canvas.height;
+
   ctx.save();
   ctx.globalAlpha = screenNoise > 0 ? 0.16 : 0.035;
   ctx.fillStyle = "#fff";
 
   for (let i = 0; i < amount; i++) {
-    const x = Math.random() * canvas.width;
-    const y = Math.random() * canvas.height;
+    const x = Math.random() * viewWidth;
+    const y = Math.random() * viewHeight;
     const w = Math.random() * 2 + 1;
     const h = Math.random() * 2 + 1;
 
@@ -1694,11 +1723,21 @@ backFromWarningBtn.addEventListener("click", async () => {
   showScreen(menuScreen);
 });
 
-window.addEventListener("resize", () => {
+function handleResize() {
   if (!activeLevel) return;
-  resizeCanvas();
-  updateCamera();
-});
+
+  requestAnimationFrame(() => {
+    resizeCanvas();
+    updateCamera();
+    drawLevel();
+  });
+}
+
+window.addEventListener("resize", handleResize);
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", handleResize);
+}
 
 updateContinueButton();
 updateSoundToggleButton();
