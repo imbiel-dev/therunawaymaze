@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Runaway Maze</title>
+
+  <meta name="description" content="A psychological maze horror game. Don't touch the walls. Find the exit.">
+  <meta name="theme-color" content="#050505">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="The Runaway Maze">
+  <meta property="og:description" content="Don't touch the walls. Find the exit. Escape while you can.">
+  <meta property="og:image" content="assets/preview.png">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Runaway Maze">
+  <meta name="twitter:description" content="Don't touch the walls. Find the exit. Escape while you can.">
+  <meta name="twitter:image" content="assets/preview.png">
+
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="gameShell">
+
+    <button id="soundToggleBtn" class="soundToggle" type="button">SOM: ON</button>
+
+    <section id="menuScreen" class="screen active">
+      <div class="menuBox">
+        <p class="tinyText">não toque nas paredes</p>
+       <h1>THE<br>RUNAWAY<br>MAZE</h1>
+
+        <button id="newGameBtn">NOVO JOGO</button>
+        <button id="continueBtn">CONTINUAR</button>
+        <button id="resetSaveBtn" class="secondary">APAGAR SAVE</button>
+
+        <p id="menuHint">chegue até a saída.</p>
+        <p class="instaTag">@oficial.gabz</p>
+      </div>
+    </section>
+
+    <section id="warningScreen" class="screen">
+      <div class="menuBox warningBox">
+        <p class="tinyText">antes de entrar</p>
+        <h1>AVISO</h1>
+
+        <p class="warningText">
+          Este jogo contém sons altos, luzes piscando, tremores na tela
+          e sustos repentinos.
+          <br><br>
+          Jogue em um ambiente tranquilo.
+          Use fones apenas se quiser uma experiência mais intensa.
+          <br><br>
+          Não toque nas paredes.
+        </p>
+
+        <button id="startAfterWarningBtn">ENTRAR NO LABIRINTO</button>
+        <button id="backFromWarningBtn" class="secondary">VOLTAR</button>
+      </div>
+    </section>
+    
+    <section id="gameScreen" class="screen">
+      <header id="hud">
+        <div>
+          <span>FASE</span>
+          <strong id="levelNumber">1</strong>
+        </div>
+
+        <p id="levelTitle">Entrada</p>
+
+        <button id="saveExitBtn">SALVAR E SAIR</button>
+      </header>
+
+      <main id="stageWrap">
+        <canvas id="gameCanvas" width="900" height="520"></canvas>
+
+        <div id="messageOverlay"></div>
+
+        <div id="jumpscareOverlay">
+          <img id="jumpscareImage" src="assets/1.png" alt="">
+        </div>
+
+        <div id="fakeCursor"></div>
+      </main>
+
+      <div id="mobileControls">
+        <button data-dir="up">▲</button>
+        <div>
+          <button data-dir="left">◀</button>
+          <button data-dir="down">▼</button>
+          <button data-dir="right">▶</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="endingScreen" class="screen">
+      <div class="menuBox">
+        <p class="tinyText">você chegou até aqui</p>
+        <h1>ELA<br>LEMBROU</h1>
+        <p id="endingText">
+          Parabéns. Você conseguiu fugir.<br>
+          Por enquanto.<br><br>
+
+          Logo eu vou te prender aqui novamente.<br>
+          Me segue no Instagram: <strong>@oficial.gabz</strong><br>
+          Quando chegar a hora de voltar, eu aviso.<br><br>
+
+          Se você gravar ou postar sua fuga,<br>
+          me marca. Eu vou assistir.
+        </p>
+        <button id="backMenuBtn">VOLTAR AO MENU</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

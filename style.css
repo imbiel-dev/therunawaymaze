@@ -1,0 +1,751 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #050505;
+  color: #e7e7e7;
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+#gameShell {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  background:
+    radial-gradient(circle at center, rgba(80, 0, 0, 0.18), transparent 42%),
+    linear-gradient(180deg, #090909, #010101);
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.screen.active {
+  display: flex;
+}
+
+#menuScreen,
+#warningScreen,
+#endingScreen {
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.menuBox {
+  width: min(92vw, 460px);
+  padding: 34px 26px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(10, 10, 10, 0.92);
+  box-shadow: 0 0 80px rgba(120, 0, 0, 0.25);
+  text-align: center;
+}
+
+.tinyText {
+  margin: 0 0 10px;
+  color: #888;
+  font-size: 12px;
+  letter-spacing: 5px;
+  text-transform: lowercase;
+}
+
+h1 {
+  margin: 0 0 30px;
+  font-size: clamp(40px, 9vw, 68px);
+  line-height: 0.92;
+  letter-spacing: -3px;
+  color: #f2f2f2;
+  text-shadow:
+    2px 0 #6d0000,
+    -2px 0 #001a2e,
+    0 0 22px rgba(255,0,0,0.25);
+}
+
+.menuBox button {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+  padding: 15px 18px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: #dedede;
+  color: #080808;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.menuBox button:hover {
+  background: #ffffff;
+}
+
+.menuBox button.secondary {
+  background: transparent;
+  color: #aaa;
+}
+
+.menuBox button.secondary:hover {
+  color: #fff;
+}
+
+#continueBtn.disabled {
+  opacity: 0.32;
+  pointer-events: none;
+}
+
+#menuHint,
+#endingText {
+  color: #888;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+#gameScreen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+#hud {
+  width: min(96vw, 900px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: #d9d9d9;
+  gap: 12px;
+}
+
+#hud div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+#hud span {
+  font-size: 11px;
+  color: #777;
+  letter-spacing: 3px;
+}
+
+#hud strong {
+  font-size: 24px;
+}
+
+#levelTitle {
+  margin: 0;
+  color: #aaa;
+  font-size: 14px;
+  text-align: center;
+}
+
+#saveExitBtn {
+  border: 1px solid rgba(255,255,255,0.14);
+  background: transparent;
+  color: #aaa;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+#saveExitBtn:hover {
+  color: white;
+  border-color: rgba(255,255,255,0.4);
+}
+
+#stageWrap {
+  width: min(96vw, 900px);
+  aspect-ratio: 900 / 520;
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow:
+    0 0 50px rgba(0,0,0,0.8),
+    inset 0 0 40px rgba(0,0,0,0.9);
+  background: #111;
+  overflow: hidden;
+}
+
+#gameCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #101010;
+}
+
+#stageWrap.flicker {
+  animation: flicker 0.12s infinite;
+}
+
+#stageWrap.dangerPulse {
+  animation: dangerPulse 0.9s infinite;
+}
+
+@keyframes flicker {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(0.55); }
+  100% { filter: brightness(1.18); }
+}
+
+@keyframes dangerPulse {
+  0% { box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+  50% { box-shadow: 0 0 70px rgba(120,0,0,0.45); }
+  100% { box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+}
+
+#messageOverlay {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  min-width: 220px;
+  max-width: 85%;
+  padding: 13px 18px;
+  background: rgba(0,0,0,0.78);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e5e5e5;
+  text-align: center;
+  font-size: 14px;
+  letter-spacing: 1px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+#messageOverlay.show {
+  opacity: 1;
+}
+
+#jumpscareOverlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: black;
+  z-index: 20;
+}
+
+#jumpscareOverlay.show {
+  display: flex;
+  animation: jumpFlash 0.55s linear;
+}
+
+@keyframes jumpFlash {
+  0% { filter: brightness(4) contrast(3); transform: scale(1.1); }
+  35% { filter: brightness(1.4) contrast(2); transform: scale(1.02); }
+  100% { filter: brightness(0.8) contrast(1.3); transform: scale(1); }
+}
+
+#creature {
+  width: min(78vw, 430px);
+  height: min(78vw, 430px);
+  position: relative;
+  border-radius: 44% 56% 51% 49%;
+  background:
+    radial-gradient(circle at 45% 40%, rgba(255,255,255,0.2), transparent 8%),
+    radial-gradient(circle at 55% 43%, rgba(255,255,255,0.16), transparent 7%),
+    radial-gradient(circle at center, #1e1e1e, #030303 68%);
+  box-shadow:
+    inset 0 0 80px black,
+    0 0 90px rgba(255,255,255,0.08);
+  transform: rotate(-2deg);
+}
+
+.eye {
+  position: absolute;
+  top: 33%;
+  width: 72px;
+  height: 28px;
+  background: #e8e8e8;
+  border-radius: 50%;
+  box-shadow: 0 0 28px rgba(255,255,255,0.5);
+}
+
+.eye::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  background: black;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.eyeLeft {
+  left: 26%;
+  transform: rotate(9deg);
+}
+
+.eyeRight {
+  right: 24%;
+  transform: rotate(-11deg);
+}
+
+.mouth {
+  position: absolute;
+  left: 50%;
+  top: 57%;
+  width: 44px;
+  height: 120px;
+  background: #000;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  box-shadow: inset 0 0 20px #2b0000;
+}
+
+#fakeCursor {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #b30000;
+  border: 2px solid #fff;
+  box-shadow: 0 0 18px rgba(255,0,0,0.85);
+  display: none;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#fakeCursor.active {
+  display: block;
+}
+
+#mobileControls {
+  margin-top: 14px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+#mobileControls div {
+  display: flex;
+  gap: 6px;
+}
+
+#mobileControls button {
+  width: 64px;
+  height: 54px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+body.shake #stageWrap {
+  animation: shake 0.18s linear 3;
+}
+
+@keyframes shake {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(5px, -3px); }
+  50% { transform: translate(-4px, 4px); }
+  75% { transform: translate(3px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+
+#stageWrap {
+  width: min(96vw, 1100px);
+  aspect-ratio: 16 / 9;
+}
+
+#gameCanvas {
+  image-rendering: pixelated;
+}
+
+#jumpscareOverlay {
+  background:
+    radial-gradient(circle at center, rgba(120, 0, 0, 0.45), #000 58%),
+    #000;
+}
+
+#jumpscareImage {
+  width: min(92vw, 760px);
+  max-height: 92%;
+  object-fit: contain;
+  filter: contrast(1.55) brightness(0.9) saturate(0.75);
+  animation: jumpscareImageHit 0.55s linear;
+}
+
+@keyframes jumpscareImageHit {
+  0% {
+    transform: scale(1.35) rotate(-2deg);
+    filter: brightness(3.2) contrast(2.5) saturate(0);
+  }
+
+  18% {
+    transform: scale(1.05) rotate(2deg);
+  }
+
+  38% {
+    transform: scale(1.22) rotate(-1deg);
+    filter: brightness(1.6) contrast(2.1);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(0.8) contrast(1.4);
+  }
+}
+
+
+#stageWrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, transparent 38%, rgba(0,0,0,0.42) 72%, rgba(0,0,0,0.82) 100%);
+  mix-blend-mode: multiply;
+}
+
+
+#stageWrap.darkRoom::after {
+  background:
+    radial-gradient(circle at center, transparent 20%, rgba(0,0,0,0.68) 48%, rgba(0,0,0,0.96) 100%);
+}
+
+#stageWrap.redRoom {
+  box-shadow:
+    0 0 80px rgba(100, 0, 0, 0.35),
+    inset 0 0 70px rgba(110, 0, 0, 0.45);
+}
+
+#stageWrap.softGlitch {
+  animation: softGlitch 0.16s infinite;
+}
+
+@keyframes softGlitch {
+  0% { transform: translate(0, 0); filter: brightness(1); }
+  35% { transform: translate(1px, -1px); filter: brightness(0.82); }
+  70% { transform: translate(-1px, 1px); filter: brightness(1.15); }
+  100% { transform: translate(0, 0); filter: brightness(1); }
+}
+
+/* Nome novo mais forte no menu */
+.menuBox h1 {
+  font-size: clamp(36px, 8vw, 64px);
+  line-height: 0.88;
+}
+
+/* Instagram discreto no menu */
+.instaTag {
+  margin: 22px 0 0;
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.42);
+  text-shadow: 0 0 14px rgba(255,255,255,0.12);
+}
+
+.instaTag:hover {
+  color: rgba(255,255,255,0.8);
+}
+
+/* Final mais legível */
+#endingText strong {
+  color: #e7e7e7;
+}
+
+/* Remove a sombra preta pesada que estava atrapalhando a visão */
+#stageWrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, transparent 76%, rgba(0,0,0,0.14) 100%) !important;
+  mix-blend-mode: multiply;
+}
+
+#stageWrap.darkRoom::after {
+  background:
+    radial-gradient(circle at center, transparent 80%, rgba(0,0,0,0.16) 100%) !important;
+}
+
+/* Jumpscare com imagem mais forte */
+#jumpscareImage {
+  width: min(94vw, 820px);
+  max-height: 94%;
+  object-fit: contain;
+  filter: contrast(1.7) brightness(0.92) saturate(0.8);
+  animation: jumpscareImageHit 0.52s linear;
+}
+
+@keyframes jumpscareImageHit {
+  0% {
+    transform: scale(1.45) rotate(-3deg);
+    filter: brightness(3.4) contrast(2.8) saturate(0);
+  }
+
+  14% {
+    transform: scale(1.05) rotate(2deg);
+  }
+
+  32% {
+    transform: scale(1.25) rotate(-1deg);
+    filter: brightness(1.8) contrast(2.3);
+  }
+
+  60% {
+    transform: scale(1.12) rotate(1deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(0.85) contrast(1.55);
+  }
+}
+/* Camada visual geral */
+#gameShell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(150, 0, 0, 0.10), transparent 24%),
+    radial-gradient(circle at 78% 70%, rgba(255, 255, 255, 0.035), transparent 20%),
+    linear-gradient(90deg, transparent, rgba(255,255,255,0.018), transparent);
+  animation: ambientBreath 5.5s ease-in-out infinite;
+}
+
+#gameShell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.018) 0,
+      rgba(255,255,255,0.018) 1px,
+      transparent 1px,
+      transparent 5px
+    );
+  opacity: 0.18;
+}
+
+.screen {
+  z-index: 1;
+}
+
+@keyframes ambientBreath {
+  0% {
+    opacity: 0.65;
+    filter: brightness(0.95);
+  }
+
+  50% {
+    opacity: 1;
+    filter: brightness(1.12);
+  }
+
+  100% {
+    opacity: 0.65;
+    filter: brightness(0.95);
+  }
+}
+
+/* Botão de som */
+.soundToggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  padding: 10px 13px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.52);
+  color: rgba(255,255,255,0.72);
+  font-size: 12px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.soundToggle:hover {
+  color: #fff;
+  border-color: rgba(255,255,255,0.42);
+}
+
+.soundToggle.off {
+  color: rgba(255,120,120,0.82);
+}
+
+/* Tela de aviso */
+.warningBox h1 {
+  margin-bottom: 20px;
+}
+
+.warningText {
+  color: #aaa;
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0 0 26px;
+}
+
+/* Mais presença no palco */
+#stageWrap {
+  box-shadow:
+    0 0 65px rgba(0,0,0,0.9),
+    0 0 120px rgba(90,0,0,0.18),
+    inset 0 0 42px rgba(0,0,0,0.96);
+}
+
+#gameCanvas {
+  filter: contrast(1.12) brightness(0.58);
+}
+
+/* Vignette leve sem tampar visão */
+#stageWrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, transparent 68%, rgba(0,0,0,0.36) 100%) !important;
+  mix-blend-mode: multiply;
+}
+
+#stageWrap.darkRoom::after {
+  background:
+    radial-gradient(circle at center, transparent 62%, rgba(0,0,0,0.48) 100%) !important;
+}
+
+#warningScreen {
+  background:
+    radial-gradient(circle at center, rgba(90,0,0,0.18), transparent 45%),
+    rgba(0,0,0,0.72);
+}
+
+.warningBox {
+  max-width: 520px;
+  animation: warningArrive 0.35s ease-out;
+}
+
+.warningBox h1 {
+  font-size: clamp(46px, 9vw, 76px);
+  margin-bottom: 20px;
+}
+
+@keyframes warningArrive {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
+
+
+
+
+
+@media (max-width: 768px) {
+  #gameScreen {
+    padding: 10px;
+  }
+
+  #stageWrap {
+    width: 96vw;
+    height: calc(100vh - 205px);
+    aspect-ratio: auto;
+  }
+
+  #hud {
+    width: 96vw;
+  }
+
+  #mobileControls button {
+    width: 72px;
+    height: 58px;
+    font-size: 25px;
+  }
+  .soundToggle {
+    top: 8px;
+    right: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .warningText {
+    font-size: 13px;
+  }
+  .soundToggle {
+    position: fixed;
+    top: auto;
+    right: 10px;
+    bottom: 12px;
+    z-index: 80;
+    width: 54px;
+    height: 34px;
+    padding: 0;
+    font-size: 0;
+    opacity: 0.72;
+  }
+
+  .soundToggle::after {
+    content: "SOM";
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  .soundToggle.off::after {
+    content: "OFF";
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+@media (max-width: 768px) {
+  body {
+    overflow: hidden;
+  }
+
+  #gameScreen {
+    justify-content: flex-start;
+    padding-top: 14px;
+  }
+
+  #hud {
+    font-size: 12px;
+  }
+
+  #saveExitBtn {
+    font-size: 11px;
+    padding: 8px;
+  }
+
+  #stageWrap {
+    width: 96vw;
+    margin-top: 4px;
+  }
+
+  #mobileControls {
+    display: flex;
+  }
+}
