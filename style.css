@@ -652,6 +652,160 @@ body.shake #stageWrap {
 }
 
 
+#screenBlinkOverlay,
+#redFlashOverlay,
+#fogOverlay,
+#randomShadow {
+  position: absolute;
+  pointer-events: none;
+}
+
+#screenBlinkOverlay {
+  inset: 0;
+  z-index: 28;
+  opacity: 0;
+  background: var(--blink-color, rgba(255,255,255,0.45));
+}
+
+#screenBlinkOverlay.active {
+  animation: screenBlink var(--blink-duration, 240ms) steps(2, end);
+}
+
+@keyframes screenBlink {
+  0% {
+    opacity: 0;
+  }
+
+  18% {
+    opacity: var(--blink-opacity, 0.38);
+  }
+
+  32% {
+    opacity: 0;
+  }
+
+  48% {
+    opacity: calc(var(--blink-opacity, 0.38) * 0.75);
+  }
+
+  62% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+#redFlashOverlay {
+  inset: 0;
+  z-index: 27;
+  opacity: 0;
+  background:
+    radial-gradient(circle at center, rgba(255,0,0,0.24), rgba(90,0,0,0.08) 45%, transparent 76%);
+}
+
+#redFlashOverlay.active {
+  animation: redFlash var(--red-flash-duration, 260ms) ease-out;
+}
+
+@keyframes redFlash {
+  0% {
+    opacity: 0;
+  }
+
+  22% {
+    opacity: var(--red-flash-opacity, 0.38);
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+#fogOverlay {
+  inset: -20%;
+  z-index: 6;
+  opacity: 0.14;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.06), transparent 22%),
+    radial-gradient(circle at 72% 65%, rgba(255,255,255,0.045), transparent 28%),
+    linear-gradient(90deg, transparent, rgba(255,255,255,0.035), transparent);
+  filter: blur(14px);
+  animation: fogDrift 13s ease-in-out infinite alternate;
+  mix-blend-mode: screen;
+}
+
+@keyframes fogDrift {
+  from {
+    transform: translateX(-28px) translateY(8px) scale(1.02);
+  }
+
+  to {
+    transform: translateX(34px) translateY(-10px) scale(1.08);
+  }
+}
+
+#randomShadow {
+  left: 0;
+  top: 0;
+  width: 34px;
+  height: 64px;
+  z-index: 9;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 44% 24%, rgba(255,255,255,0.32), transparent 5%),
+    radial-gradient(circle at 62% 25%, rgba(255,255,255,0.22), transparent 5%),
+    radial-gradient(ellipse at center, rgba(0,0,0,0.92), rgba(20,0,0,0.55) 54%, transparent 76%);
+  filter: blur(1.4px);
+  transform: translate(-999px, -999px) scale(1);
+}
+
+#randomShadow.show {
+  animation: shadowAppear var(--shadow-duration, 620ms) ease-in-out forwards;
+}
+
+@keyframes shadowAppear {
+  0% {
+    opacity: 0;
+    transform: translate(var(--shadow-x), var(--shadow-y)) scale(0.92);
+  }
+
+  18% {
+    opacity: var(--shadow-opacity, 0.48);
+  }
+
+  60% {
+    opacity: var(--shadow-opacity, 0.48);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(var(--shadow-x), var(--shadow-y)) scale(1.12);
+  }
+}
+
+
+#jumpscareOverlay {
+  z-index: 35;
+}
+
+#jumpscareImage {
+  z-index: 36;
+}
+
+
+#gameCanvas {
+  filter: contrast(1.12) brightness(0.62);
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -753,6 +907,20 @@ body {
   #mobileControls div {
     display: flex;
     gap: 8px;
+  }
+
+  #fogOverlay {
+    opacity: 0.10;
+    filter: blur(10px);
+  }
+
+  #randomShadow {
+    width: 26px;
+    height: 50px;
+  }
+
+  #gameCanvas {
+    filter: contrast(1.08) brightness(0.70);
   }
 
   #mobileControls button {

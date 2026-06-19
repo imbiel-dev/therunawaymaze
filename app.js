@@ -25,6 +25,11 @@ const messageOverlay = document.getElementById("messageOverlay");
 const jumpscareOverlay = document.getElementById("jumpscareOverlay");
 const mobileButtons = document.querySelectorAll("#mobileControls button");
 
+const screenBlinkOverlay = document.getElementById("screenBlinkOverlay");
+const redFlashOverlay = document.getElementById("redFlashOverlay");
+const fogOverlay = document.getElementById("fogOverlay");
+const randomShadow = document.getElementById("randomShadow");
+
 const GAME_NAME = "The Runaway Maze";
 
 const SUPABASE_URL = "https://sfzayitnovlxyaxzfspu.supabase.co";
@@ -73,6 +78,18 @@ let soundEnabled = localStorage.getItem(SOUND_KEY) !== "false";
 
 let supabaseUser = null;
 
+
+let isJumpscareActive = false;
+let lastShadowTime = 0;
+let lastAmbientScareTime = 0;
+let lastRedFlashTime = 0;
+let lastIdleBlinkTime = 0;
+let lastPlayerX = null;
+let lastPlayerY = null;
+let lastPlayerMoveTime = performance.now();
+let dangerPressure = 0;
+
+
 const player = {
   x: 80,
   y: 80,
@@ -87,7 +104,7 @@ const levelConfigs = [
     seed: 12,
     complexity: 0.10,
     darkness: 0.34,
-    message: "Não é difícil. Só parece.",
+    message: "O caminho ainda não aprendeu você.",
     event: "quiet"
   },
   {
@@ -95,7 +112,7 @@ const levelConfigs = [
     seed: 44,
     complexity: 0.10,
     darkness: 0.48,
-    message: "A luz não ajuda. Ela escolhe.",
+    message: "A luz falha quando você corre.",
     event: "flicker"
   },
   {
@@ -112,7 +129,7 @@ const levelConfigs = [
     seed: 117,
     complexity: 0.10,
     darkness: 0.38,
-    message: "Ele vai passar. Talvez.",
+    message: "Ele passa quando você acha que vai ficar.",
     event: "fakePassenger"
   },
   {
@@ -120,7 +137,7 @@ const levelConfigs = [
     seed: 160,
     complexity: 0.15,
     darkness: 0.34,
-    message: "Essa fase é fácil demais.",
+    message: "A fase não mudou. Você mudou.",
     event: "fakeDifficulty"
   },
   {
@@ -136,7 +153,7 @@ const levelConfigs = [
     seed: 244,
     complexity: 0.07,
     darkness: 0.47,
-    message: "Espere antes de confiar.",
+    message: "O vermelho espera.",
     event: "movingWalls"
   },
   {
@@ -144,7 +161,7 @@ const levelConfigs = [
     seed: 291,
     complexity: 0.10,
     darkness: 0.52,
-    message: "Não toque nela. Ela também não toca em você.",
+    message: "Ela olha, mas ainda não quer você.",
     event: "stillCreature"
   },
   {
@@ -152,7 +169,7 @@ const levelConfigs = [
     seed: 334,
     complexity: 0.05,
     darkness: 0.58,
-    message: "Parece a mesma fase.",
+    message: "Agora ela conhece seu caminho.",
     event: "hunter"
   },
   {
@@ -160,10 +177,46 @@ const levelConfigs = [
     seed: 410,
     complexity: 0.04,
     darkness: 0.64,
-    message: "A fase 10 não existe.",
+    message: "Seu medo virou mapa.",
     event: "final"
   }
 ];
+
+const LORE_MESSAGES = {
+  wall: [
+    "O caminho lembra seus erros.",
+    "Não foi a parede. Foi você.",
+    "A saída percebeu sua pressa.",
+    "Você corre igual da última vez.",
+    "Seu medo virou mapa."
+  ],
+
+  near: [
+    "Ele não está atrás de você. Está esperando.",
+    "O silêncio não protege.",
+    "A fase não mudou. Você mudou.",
+    "Tem algo no limite da câmera.",
+    "O labirinto ouviu."
+  ],
+
+  idle: [
+    "Parar também ensina.",
+    "Ele espera quando você espera.",
+    "Você voltou de novo.",
+    "O labirinto não tem pressa."
+  ],
+
+  light: [
+    "A luz não mente. Ela omite.",
+    "Você viu só metade.",
+    "Nem tudo que pisca quer avisar."
+  ]
+};
+
+function randomFrom(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 
 const audio = {
   ctx: null,
@@ -176,6 +229,8 @@ const audio = {
   ambientGain2: null,
   muted: !soundEnabled,
   extra: {},
+  dangerPressure: 0,
+  ambientScareTimer: null,
 
   init() {
     if (this.ctx) return;
@@ -213,6 +268,7 @@ const audio = {
 
     this.startHeartbeat();
     this.startRandomWhispers();
+    this.startAmbientScares();
   },
 
   resume() {
@@ -328,64 +384,113 @@ playExtra(key, volume = 0.85) {
   });
 },
 
-randomScareSound() {
-  const options = ["metal1", "metal2", "risada"];
-  const selected = options[Math.floor(Math.random() * options.length)];
-  this.playExtra(selected, 0.95);
-},
+randomScareSound(context = "default") {
+  const options =
+      context === "wall"
+        ? ["metal1", "metal2"]
+        : ["metal1", "metal2", "risada"];
 
-randomAmbientHit() {
-  const options = ["ambiente1", "ambiente2"];
-  const selected = options[Math.floor(Math.random() * options.length)];
-  this.playExtra(selected, 0.55);
-},
+    const selected = options[Math.floor(Math.random() * options.length)];
+    this.playExtra(selected, context === "wall" ? 1 : 0.95);
+  },
+
+  randomAmbientHit() {
+    const options = ["ambiente1", "ambiente2"];
+    const selected = options[Math.floor(Math.random() * options.length)];
+    this.playExtra(selected, 0.55);
+  },
+
+  setDangerPressure(value) {
+    this.dangerPressure = Math.max(0, Math.min(1, value));
+  },
+
+  playRandomAmbientScare() {
+    if (this.muted || isJumpscareActive) return;
+
+    const options = ["ambiente1", "ambiente2", "risada"];
+    const selected = options[Math.floor(Math.random() * options.length)];
+    const volume = selected === "risada"
+      ? 0.34 + Math.random() * 0.22
+      : 0.42 + Math.random() * 0.28;
+
+    this.playExtra(selected, volume);
+  },
+
+  playWallHitScare() {
+    if (this.muted) return;
+
+    this.playExtra("metal1", 0.95);
+
+    setTimeout(() => {
+      this.playExtra("metal2", 0.85);
+    }, 90);
+  },
+
+  startAmbientScares() {
+    if (this.ambientScareTimer) clearInterval(this.ambientScareTimer);
+
+    this.ambientScareTimer = setInterval(() => {
+      if (!gameRunning || !activeLevel || this.muted || isJumpscareActive) return;
+
+      const chance = 0.12 + currentLevel * 0.018;
+
+      if (Math.random() < chance) {
+        this.playRandomAmbientScare();
+      }
+    }, 6800);
+  },
+
 
   setMuted(muted) {
   this.muted = muted;
   soundEnabled = !muted;
   localStorage.setItem(SOUND_KEY, soundEnabled ? "true" : "false");
 
-  if (this.master && this.ctx) {
-    this.master.gain.setTargetAtTime(muted ? 0 : 0.62, this.ctx.currentTime, 0.12);
-  }
-},
-
-toggleMuted() {
-  this.setMuted(!this.muted);
-},
-
-tension() {
-  this.beep(38, 0.22, 0.05, "sawtooth");
-  setTimeout(() => this.beep(51, 0.18, 0.035, "triangle"), 140);
-},
-
-startRandomWhispers() {
-  if (this.whisperTimer) clearInterval(this.whisperTimer);
-
-  this.whisperTimer = setInterval(() => {
-    if (!gameRunning || !activeLevel || this.muted) return;
-
-    const chance = 0.12 + currentLevel * 0.012;
-
-    if (Math.random() < chance) {
-      this.whisper();
+    if (this.master && this.ctx) {
+      this.master.gain.setTargetAtTime(muted ? 0 : 0.62, this.ctx.currentTime, 0.12);
     }
-  }, 5200);
-},
+  },
+
+  toggleMuted() {
+    this.setMuted(!this.muted);
+  },
+
+  tension() {
+    this.beep(38, 0.22, 0.05, "sawtooth");
+    setTimeout(() => this.beep(51, 0.18, 0.035, "triangle"), 140);
+  },
+
+  startRandomWhispers() {
+    if (this.whisperTimer) clearInterval(this.whisperTimer);
+
+    this.whisperTimer = setInterval(() => {
+      if (!gameRunning || !activeLevel || this.muted) return;
+
+      const chance = 0.12 + currentLevel * 0.012;
+
+      if (Math.random() < chance) {
+        this.whisper();
+      }
+    }, 5200);
+  },
 
   startHeartbeat() {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
 
     this.heartbeatTimer = setInterval(() => {
-      if (!gameRunning || !activeLevel) return;
+      if (!gameRunning || !activeLevel || this.muted) return;
 
-      const intensity = activeLevel.config.darkness + currentLevel * 0.025;
+      const pressure = this.dangerPressure || 0;
+      const intensity = activeLevel.config.darkness + currentLevel * 0.035 + pressure * 0.38;
 
       if (Math.random() < intensity) {
-        this.beep(52, 0.07, 0.035, "sine");
-        setTimeout(() => this.beep(47, 0.09, 0.028, "sine"), 120);
+        const firstBeat = 0.055 + pressure * 0.085;
+        const secondBeat = 0.045 + pressure * 0.065;
+
+        this.beep(52, 0.08, firstBeat, "sine");
+        setTimeout(() => this.beep(47, 0.10, secondBeat, "sine"), 115);
       }
-    }, 1450);
+    }, 1120);
   }
 };
 
@@ -542,6 +647,11 @@ function applyLevelSpecials(level) {
   }
 
   if (event === "fakePassenger") {
+    level.obstacles.push(
+      movingObstacle(8, 15, "horizontal", 0.70, 0.16, level),
+      movingObstacle(24, 14, "vertical", 0.75, 0.15, level)
+    );
+
     level.passenger = {
       active: true,
       x: level.width + 60,
@@ -556,7 +666,7 @@ function applyLevelSpecials(level) {
       id: "fake_room_flash",
       rect: cellRect(13, 11, tile),
       type: "lightLie",
-      message: "Era só luz."
+      message: "A luz não mentiu. Ela escondeu."
     });
   }
 
@@ -597,22 +707,31 @@ function applyLevelSpecials(level) {
       type: "wakeHunter",
       message: "Agora queria."
     });
+
+    level.obstacles.push(
+      movingObstacle(8, 15, "horizontal", 0.70, 0.16, level),
+      movingObstacle(24, 14, "vertical", 0.75, 0.15, level)
+    );
   }
 
   if (event === "final") {
+    level.obstacles.push(
+      movingObstacle(8, 15, "horizontal", 0.70, 0.16, level),
+      movingObstacle(24, 14, "vertical", 0.75, 0.15, level)
+    );
     level.triggers.push(
       {
         id: "final_mid",
         rect: cellRect(13, 11, tile),
         type: "hardJump",
         image: "mid",
-        message: "Você abriu."
+        message: "Obrigado por me ensinar."
       },
       {
         id: "final_near_exit",
         rect: cellRect(25, 3, tile),
         type: "flicker",
-        message: "A saída respirou."
+        message: "A saída percebeu sua pressa."
       }
     );
   }
@@ -857,6 +976,10 @@ function startGame(levelIndex = 0) {
   gameRunning = true;
 
 
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
+
   lastTime = performance.now();
   gameLoop(lastTime);
 }
@@ -876,17 +999,32 @@ function loadLevel(index) {
 
   audio.setAmbient(index);
 
+  if (index >= 2) {
+    stageWrap.classList.add("darkRoom");
+  }
+
+  if (fogOverlay) {
+    const fogAmount = Math.min(0.26, 0.10 + index * 0.018);
+    fogOverlay.style.opacity = String(fogAmount);
+  }
+
+  triggerScreenBlink(
+    Math.min(0.34, 0.16 + index * 0.015),
+    280,
+    index >= 6 ? "red" : "white"
+  );
+
   if (config.message) {
     showMessage(config.message, config.messageTime || 2100);
   }
 
   saveGame();
 
-requestAnimationFrame(() => {
-  resizeCanvas();
-  updateCamera();
-  drawLevel();
-});
+  requestAnimationFrame(() => {
+    resizeCanvas();
+    updateCamera();
+    drawLevel();
+  });
 }
 
 function resetStageEffects() {
@@ -902,6 +1040,28 @@ function resetStageEffects() {
   jumpscareOverlay.classList.remove("show");
   document.body.classList.remove("shake");
   screenNoise = 0;
+
+  hideRandomShadow();
+
+  if (screenBlinkOverlay) {
+    screenBlinkOverlay.classList.remove("active");
+  }
+
+  if (redFlashOverlay) {
+    redFlashOverlay.classList.remove("active");
+  }
+
+  if (fogOverlay) {
+    fogOverlay.style.opacity = "0.12";
+  }
+
+  dangerPressure = 0;
+  isJumpscareActive = false;
+
+  if (audio?.setDangerPressure) {
+    audio.setDangerPressure(0);
+  }
+
 }
 
 function resizeCanvas() {
@@ -939,6 +1099,221 @@ function triggerShake() {
   }, 620);
 }
 
+function triggerScreenBlink(intensity = 0.35, duration = 260, color = "white") {
+  if (!screenBlinkOverlay || isJumpscareActive) return;
+
+  const colors = {
+    white: "rgba(255,255,255,0.72)",
+    black: "rgba(0,0,0,0.78)",
+    red: "rgba(150,0,0,0.62)"
+  };
+
+  screenBlinkOverlay.style.setProperty("--blink-color", colors[color] || colors.white);
+  screenBlinkOverlay.style.setProperty("--blink-opacity", String(intensity));
+  screenBlinkOverlay.style.setProperty("--blink-duration", `${duration}ms`);
+
+  screenBlinkOverlay.classList.remove("active");
+  void screenBlinkOverlay.offsetWidth;
+  screenBlinkOverlay.classList.add("active");
+
+  setTimeout(() => {
+    screenBlinkOverlay.classList.remove("active");
+  }, duration + 40);
+}
+
+function triggerRedFlash(level = 1) {
+  if (!redFlashOverlay || isJumpscareActive) return;
+
+  const now = performance.now();
+
+  if (now - lastRedFlashTime < 900) return;
+  lastRedFlashTime = now;
+
+  const opacity = level === 3 ? 0.55 : level === 2 ? 0.38 : 0.24;
+  const duration = level === 3 ? 340 : level === 2 ? 260 : 190;
+
+  redFlashOverlay.style.setProperty("--red-flash-opacity", String(opacity));
+  redFlashOverlay.style.setProperty("--red-flash-duration", `${duration}ms`);
+
+  redFlashOverlay.classList.remove("active");
+  void redFlashOverlay.offsetWidth;
+  redFlashOverlay.classList.add("active");
+
+  setTimeout(() => {
+    redFlashOverlay.classList.remove("active");
+  }, duration + 40);
+}
+
+function hideRandomShadow() {
+  if (!randomShadow) return;
+  randomShadow.classList.remove("show");
+}
+
+function spawnShadowInCameraRange() {
+  if (!randomShadow || !activeLevel || isJumpscareActive) return;
+
+  const now = performance.now();
+
+  if (now - lastShadowTime < 4200) return;
+  lastShadowTime = now;
+
+  const viewWidth = canvas.logicalWidth || stageWrap.clientWidth || 800;
+  const viewHeight = canvas.logicalHeight || stageWrap.clientHeight || 500;
+
+  const playerScreenX = toScreenX(player.x + player.size / 2);
+  const playerScreenY = toScreenY(player.y + player.size / 2);
+
+  let x;
+  let y;
+
+  const side = Math.floor(Math.random() * 4);
+  const margin = 34;
+
+  if (side === 0) {
+    x = margin + Math.random() * (viewWidth - margin * 2);
+    y = margin;
+  } else if (side === 1) {
+    x = viewWidth - margin - 34;
+    y = margin + Math.random() * (viewHeight - margin * 2);
+  } else if (side === 2) {
+    x = margin + Math.random() * (viewWidth - margin * 2);
+    y = viewHeight - margin - 64;
+  } else {
+    x = margin;
+    y = margin + Math.random() * (viewHeight - margin * 2);
+  }
+
+  const distanceFromPlayer = Math.hypot(x - playerScreenX, y - playerScreenY);
+
+  if (distanceFromPlayer < 120) {
+    x = viewWidth - x;
+    y = viewHeight - y;
+  }
+
+  const duration = 420 + Math.random() * 520;
+  const opacity = 0.30 + Math.random() * 0.28;
+
+  randomShadow.style.setProperty("--shadow-x", `${x}px`);
+  randomShadow.style.setProperty("--shadow-y", `${y}px`);
+  randomShadow.style.setProperty("--shadow-duration", `${duration}ms`);
+  randomShadow.style.setProperty("--shadow-opacity", String(opacity));
+
+  randomShadow.classList.remove("show");
+  void randomShadow.offsetWidth;
+  randomShadow.classList.add("show");
+
+  setTimeout(() => {
+    randomShadow.classList.remove("show");
+  }, duration + 60);
+}
+
+function distanceToRect(px, py, rect) {
+  const dx = Math.max(rect.x - px, 0, px - (rect.x + rect.w));
+  const dy = Math.max(rect.y - py, 0, py - (rect.y + rect.h));
+  return Math.hypot(dx, dy);
+}
+
+function getDistanceToNearestDanger() {
+  if (!activeLevel) return Infinity;
+
+  const px = player.x + player.size / 2;
+  const py = player.y + player.size / 2;
+
+  let nearest = Infinity;
+
+  activeLevel.obstacles.forEach((ob) => {
+    nearest = Math.min(nearest, distanceToRect(px, py, ob));
+  });
+
+  if (activeLevel.wrongExit) {
+    nearest = Math.min(nearest, distanceToRect(px, py, activeLevel.wrongExit));
+  }
+
+  if (activeLevel.creature) {
+    nearest = Math.min(nearest, distanceToRect(px, py, activeLevel.creature));
+  }
+
+  if (activeLevel.hunter) {
+    const h = activeLevel.hunter;
+    nearest = Math.min(
+      nearest,
+      Math.hypot(px - h.x, py - h.y)
+    );
+  }
+
+  if (activeLevel.passenger?.active) {
+    nearest = Math.min(
+      nearest,
+      Math.hypot(px - activeLevel.passenger.x, py - activeLevel.passenger.y)
+    );
+  }
+
+  return nearest;
+}
+
+function updatePsychologicalEvents(now, dt) {
+  if (!activeLevel || isJumpscareActive) return;
+
+  if (lastPlayerX === null || lastPlayerY === null) {
+    lastPlayerX = player.x;
+    lastPlayerY = player.y;
+  }
+
+  const movedDistance = Math.hypot(player.x - lastPlayerX, player.y - lastPlayerY);
+
+  if (movedDistance > 0.6) {
+    lastPlayerMoveTime = now;
+    lastPlayerX = player.x;
+    lastPlayerY = player.y;
+  }
+
+  const distance = getDistanceToNearestDanger();
+  const scareRange = 165 + currentLevel * 7;
+
+  dangerPressure = distance < scareRange
+    ? clamp((scareRange - distance) / scareRange, 0, 1)
+    : 0;
+
+  audio.setDangerPressure(dangerPressure);
+
+  if (dangerPressure > 0.35 && now - lastAmbientScareTime > 2900) {
+    lastAmbientScareTime = now;
+
+    audio.playRandomAmbientScare();
+
+    if (dangerPressure > 0.72) {
+      triggerRedFlash(2);
+      triggerScreenBlink(0.16, 140, "red");
+      showMessage(randomFrom(LORE_MESSAGES.near), 950);
+    } else {
+      triggerRedFlash(1);
+    }
+  }
+
+  const idleTime = now - lastPlayerMoveTime;
+
+  if (idleTime > 4200 && now - lastIdleBlinkTime > 5000) {
+    lastIdleBlinkTime = now;
+
+    triggerScreenBlink(0.14, 180, "black");
+
+    if (Math.random() < 0.65) {
+      spawnShadowInCameraRange();
+    }
+
+    if (Math.random() < 0.40) {
+      showMessage(randomFrom(LORE_MESSAGES.idle), 1000);
+    }
+  }
+
+  const shadowChance = 0.003 + currentLevel * 0.0008;
+
+  if (Math.random() < shadowChance) {
+    spawnShadowInCameraRange();
+  }
+}
+
+
 function resetPlayer(message = "Parede.") {
   const wallJumpscareLevels = ["quiet","fakeDifficulty","twoExits","stillCreature","final"];
 
@@ -949,13 +1324,13 @@ function resetPlayer(message = "Parede.") {
     player.y < activeLevel.height * 0.42;
 
   if (passedHalf) {
-
-    audio.playExtra("metal1", 0.8);
+    triggerScreenBlink(0.42, 160, "white");
+    audio.playWallHitScare();
 
     showJumpscare(650, () => {
       player.x = activeLevel.start.x - player.size / 2;
       player.y = activeLevel.start.y - player.size / 2;
-      showMessage("Era só luz.", 1200);
+      showMessage(randomFrom(LORE_MESSAGES.wall), 1300);
     }, "wall");
 
     return;
@@ -966,7 +1341,16 @@ function resetPlayer(message = "Parede.") {
 
   audio.wall();
   triggerShake();
-  showMessage(message, 950);
+  triggerScreenBlink(0.20, 130, "black");
+
+  if (Math.random() < 0.30) {
+    triggerRedFlash(1);
+  }
+
+  showMessage(
+    Math.random() < 0.45 ? randomFrom(LORE_MESSAGES.wall) : message,
+    1050
+  );
 }
 
 function nextLevel() {
@@ -995,11 +1379,21 @@ function showJumpscare(duration = 650, callback, imageKey = "default") {
   const jumpscareImage = document.getElementById("jumpscareImage");
   const selectedImage = JUMPSCARE_IMAGES[imageKey] || imageKey || JUMPSCARE_IMAGES.default;
 
+  isJumpscareActive = true;
+
+  if (screenBlinkOverlay) {
+    screenBlinkOverlay.classList.remove("active");
+  }
+
+  if (redFlashOverlay) {
+    redFlashOverlay.classList.remove("active");
+  }
+
   jumpscareImage.src = selectedImage;
 
   audio.jumpscare();
 
-  audio.randomScareSound();
+  audio.randomScareSound(imageKey);
 
   jumpscareOverlay.classList.remove("show");
   void jumpscareOverlay.offsetWidth;
@@ -1016,6 +1410,7 @@ function showJumpscare(duration = 650, callback, imageKey = "default") {
   setTimeout(() => {
     jumpscareOverlay.classList.remove("show");
     screenNoise = 0;
+    isJumpscareActive = false;
 
     if (callback) {
       callback();
@@ -1104,10 +1499,25 @@ function updateObstacles(dt) {
       ob.y = ob.baseY + move;
     }
 
+    const playerCenterX = player.x + player.size / 2;
+    const playerCenterY = player.y + player.size / 2;
+    const distance = distanceToRect(playerCenterX, playerCenterY, ob);
+
+    if (distance < 88) {
+      triggerRedFlash(distance < 42 ? 2 : 1);
+
+      if (Math.random() < 0.035) {
+        audio.playRandomAmbientScare();
+      }
+    }
+
     if (intersects(playerRect(), ob)) {
-      audio.wall();
+      audio.playWallHitScare();
       triggerShake();
-      resetPlayer("O vermelho tocou.");
+
+      showJumpscare(560, () => {
+        resetPlayer("O vermelho tocou.");
+      }, "wall");
     }
   });
 }
@@ -1176,6 +1586,8 @@ function checkTriggers() {
       if (trigger.type === "softJump") {
         stageWrap.classList.add("softGlitch");
         audio.whisper();
+        triggerScreenBlink(0.18, 180, "black");
+        triggerRedFlash(1);
         showMessage(trigger.message, 1000);
 
         setTimeout(() => {
@@ -1186,6 +1598,8 @@ function checkTriggers() {
       if (trigger.type === "lightLie") {
         stageWrap.classList.add("softGlitch");
         audio.whisper();
+        triggerScreenBlink(0.24, 220, "white");
+        showMessage(randomFrom(LORE_MESSAGES.light), 1100);
         showMessage(trigger.message, 1000);
 
         setTimeout(() => {
@@ -1198,6 +1612,9 @@ function checkTriggers() {
         audio.whisper();
         audio.tension();
         audio.playExtra("risada", 0.55);
+        triggerRedFlash(3);
+        triggerScreenBlink(0.28, 220, "red");
+        spawnShadowInCameraRange();
         stageWrap.classList.add("redRoom");
 
         if (activeLevel.hunter) {
@@ -1218,6 +1635,8 @@ function checkTriggers() {
         audio.whisper();
         audio.tension();
         audio.randomAmbientHit();
+        triggerRedFlash(2);
+        spawnShadowInCameraRange();
         showMessage(trigger.message, 1200);
 
         setTimeout(() => {
@@ -1529,12 +1948,18 @@ function drawLights() {
 
   ctx.save();
 
-  const softDarkness = Math.max(0.11, darkness * 0.34);
+  const isMobile = window.innerWidth <= 768;
+  const dangerBoost = dangerPressure * (isMobile ? 0.06 : 0.10);
+  const softDarkness = Math.max(
+    0.13,
+    darkness * (isMobile ? 0.34 : 0.44)
+  ) + dangerBoost;
 
   const viewWidth = canvas.logicalWidth || canvas.width;
   const viewHeight = canvas.logicalHeight || canvas.height;
 
-  ctx.fillStyle = `rgba(0,0,0,${softDarkness + flicker * 0.35})`;
+  const totalDarkness = clamp(softDarkness + flicker * 0.35, 0, isMobile ? 0.34 : 0.48);
+  ctx.fillStyle = `rgba(0,0,0,${totalDarkness})`;
   ctx.fillRect(0, 0, viewWidth, viewHeight);
 
   ctx.restore();
@@ -1623,6 +2048,7 @@ function gameLoop(now) {
   updateObstacles(dt);
   updateHunter(dt);
   updatePassenger(dt);
+  updatePsychologicalEvents(now, dt);
   checkTriggers();
   checkExits();
   updateCamera();
