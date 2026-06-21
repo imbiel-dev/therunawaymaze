@@ -558,7 +558,7 @@ body.shake #stageWrap {
   }
 }
 
-/* Botão de som */
+
 .soundToggle {
   position: fixed;
   top: 16px;
@@ -583,7 +583,7 @@ body.shake #stageWrap {
   color: rgba(255,120,120,0.82);
 }
 
-/* Tela de aviso */
+
 .warningBox h1 {
   margin-bottom: 20px;
 }
@@ -595,7 +595,7 @@ body.shake #stageWrap {
   margin: 0 0 26px;
 }
 
-/* Mais presença no palco */
+
 #stageWrap {
   box-shadow:
     0 0 65px rgba(0,0,0,0.9),
@@ -607,7 +607,7 @@ body.shake #stageWrap {
   filter: contrast(1.12) brightness(0.58);
 }
 
-/* Vignette leve sem tampar visão */
+
 #stageWrap::after {
   content: "";
   position: absolute;
@@ -798,6 +798,86 @@ body.shake #stageWrap {
 #gameCanvas {
   filter: contrast(1.12) brightness(0.62);
 }
+
+
+#randomShadow {
+  width: 42px;
+  height: 76px;
+  z-index: 12;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 40% 22%, rgba(255,255,255,0.42), transparent 5%),
+    radial-gradient(circle at 62% 23%, rgba(255,255,255,0.28), transparent 5%),
+    radial-gradient(ellipse at center, rgba(0,0,0,0.95), rgba(25,0,0,0.55) 54%, transparent 78%);
+  filter: blur(1.2px);
+  transform: translate(-999px, -999px);
+}
+
+#randomShadow.show {
+  animation: shadowWalk var(--shadow-duration, 900ms) ease-in-out forwards;
+}
+
+@keyframes shadowWalk {
+  0% {
+    opacity: 0;
+    transform: translate(var(--shadow-start-x), var(--shadow-start-y)) scale(0.9);
+  }
+
+  18% {
+    opacity: var(--shadow-opacity, 0.48);
+  }
+
+  70% {
+    opacity: var(--shadow-opacity, 0.48);
+    transform: translate(var(--shadow-end-x), var(--shadow-end-y)) scale(1.04);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(var(--shadow-end-x), var(--shadow-end-y)) scale(1.12);
+  }
+}
+
+
+#stageWrap.jumpscareActive #screenBlinkOverlay,
+#stageWrap.jumpscareActive #redFlashOverlay {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+#redFlashOverlay {
+  z-index: 14;
+}
+
+#screenBlinkOverlay {
+  z-index: 15;
+}
+
+#jumpscareOverlay {
+  z-index: 50;
+}
+
+#jumpscareImage {
+  z-index: 51;
+}
+
+
+#gameCanvas {
+  filter: contrast(1.14) brightness(0.66);
+}
+
+@media (max-width: 768px) {
+  #gameCanvas {
+    filter: contrast(1.1) brightness(0.76);
+  }
+
+  #randomShadow {
+    width: 30px;
+    height: 56px;
+  }
+}
+
+
 
 
 

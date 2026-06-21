@@ -83,6 +83,10 @@ let isJumpscareActive = false;
 let lastShadowTime = 0;
 let lastAmbientScareTime = 0;
 let lastRedFlashTime = 0;
+
+let lastExtraSoundTime = 0;
+let lastNearDangerMessageTime = 0;
+
 let lastIdleBlinkTime = 0;
 let lastPlayerX = null;
 let lastPlayerY = null;
@@ -94,7 +98,7 @@ const player = {
   x: 80,
   y: 80,
   size: 23,
-  speed: 2.95,
+  speed: 2.35,
   color: "#f4f4f4"
 };
 
@@ -145,7 +149,8 @@ const levelConfigs = [
     seed: 213,
     complexity: 0.09,
     darkness: 0.44,
-    message: "Lembre do aviso.",
+    message: "Lembre do aviso. Na próxima, a saída muda.",
+    messageTime: 3600,
     event: "twoExits"
   },
   {
@@ -239,7 +244,7 @@ const audio = {
     this.ctx = new AudioContext();
 
     this.master = this.ctx.createGain();
-    this.master.gain.value = this.muted ? 0 : 0.62;
+    this.master.gain.value = this.muted ? 0 : 0.80;
     this.master.connect(this.ctx.destination);
 
     this.loadExtraSounds();
@@ -281,10 +286,11 @@ const audio = {
     if (!this.ctx) return;
 
     const freq = 42 + levelIndex * 3.2;
+    this.ambientGain.gain.setTargetAtTime(0.052 + levelIndex * 0.006, this.ctx.currentTime, 0.5);
     this.ambientOsc.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.4);
     if (this.ambientOsc2 && this.ambientGain2) {
       this.ambientOsc2.frequency.setTargetAtTime(25 + levelIndex * 1.8, this.ctx.currentTime, 0.5);
-      this.ambientGain2.gain.setTargetAtTime(0.012 + levelIndex * 0.002, this.ctx.currentTime, 0.5);
+      this.ambientGain2.gain.setTargetAtTime(0.022 + levelIndex * 0.003, this.ctx.currentTime, 0.5);
     }
   },
 
@@ -312,7 +318,7 @@ const audio = {
   },
 
   step() {
-    this.beep(70 + Math.random() * 25, 0.035, 0.012, "sine");
+    this.beep(62 + Math.random() * 18, 0.026, 0.007, "sine");
   },
 
   exit() {
@@ -325,73 +331,79 @@ const audio = {
     setTimeout(() => this.beep(150 + Math.random() * 60, 0.21, 0.025, "sine"), 120);
   },
 
-  jumpscare() {
-    if (!this.ctx || this.muted) return;
+    jumpscare() {
+      if (!this.ctx || this.muted) return;
 
-    const bufferSize = this.ctx.sampleRate * 0.48;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
+      const bufferSize = this.ctx.sampleRate * 0.48;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
 
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
-    }
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      }
 
-    const noise = this.ctx.createBufferSource();
-    const noiseGain = this.ctx.createGain();
-    const osc = this.ctx.createOscillator();
-    const oscGain = this.ctx.createGain();
+      const noise = this.ctx.createBufferSource();
+      const noiseGain = this.ctx.createGain();
+      const osc = this.ctx.createOscillator();
+      const oscGain = this.ctx.createGain();
 
-    noise.buffer = buffer;
-    noiseGain.gain.value = 1.05;
+      noise.buffer = buffer;
+      noiseGain.gain.value = 1.05;
 
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(68, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(28, this.ctx.currentTime + 0.42);
-    oscGain.gain.value = 0.62;
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(68, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(28, this.ctx.currentTime + 0.42);
+      oscGain.gain.value = 0.62;
 
-    noise.connect(noiseGain);
-    osc.connect(oscGain);
-    noiseGain.connect(this.master);
-    oscGain.connect(this.master);
+      noise.connect(noiseGain);
+      osc.connect(oscGain);
+      noiseGain.connect(this.master);
+      oscGain.connect(this.master);
 
-    noise.start();
-    osc.start();
-    noise.stop(this.ctx.currentTime + 0.48);
-    osc.stop(this.ctx.currentTime + 0.48);
+      noise.start();
+      osc.start();
+      noise.stop(this.ctx.currentTime + 0.48);
+      osc.stop(this.ctx.currentTime + 0.48);
+    },
+
+    loadExtraSounds() {
+    Object.entries(EXTRA_SOUNDS).forEach(([key, src]) => {
+      const sound = new Audio(src);
+      sound.preload = "auto";
+      sound.volume = 0.75;
+      this.extra[key] = sound;
+    });
   },
 
-  loadExtraSounds() {
-  Object.entries(EXTRA_SOUNDS).forEach(([key, src]) => {
-    const sound = new Audio(src);
-    sound.preload = "auto";
-    sound.volume = 0.75;
-    this.extra[key] = sound;
-  });
-},
+  playExtra(key, volume = 0.85, cooldown = 450) {
+    if (this.muted) return;
 
-playExtra(key, volume = 0.85) {
-  if (this.muted) return;
+    const now = performance.now();
 
-  const original = this.extra[key];
-  if (!original) return;
+    if (now - lastExtraSoundTime < cooldown) {
+      return;
+    }
 
-  const sound = original.cloneNode();
-  sound.volume = volume;
-  sound.currentTime = 0;
+    lastExtraSoundTime = now;
 
-  sound.play().catch(() => {
-    // navegador bloqueou autoplay; vai tocar depois de interação do usuário
-  });
-},
+    const original = this.extra[key];
+    if (!original) return;
 
-randomScareSound(context = "default") {
-  const options =
-      context === "wall"
-        ? ["metal1", "metal2"]
-        : ["metal1", "metal2", "risada"];
+    const sound = original.cloneNode();
+    sound.volume = volume;
+    sound.currentTime = 0;
+
+    sound.play().catch(() => {});
+  },
+
+  randomScareSound(context = "default") {
+    const options =
+        context === "wall"
+          ? ["metal1", "metal2"]
+          : ["metal1", "metal2", "risada"];
 
     const selected = options[Math.floor(Math.random() * options.length)];
-    this.playExtra(selected, context === "wall" ? 1 : 0.95);
+      this.playExtra(selected, context === "wall" ? 1 : 0.95);
   },
 
   randomAmbientHit() {
@@ -407,13 +419,21 @@ randomScareSound(context = "default") {
   playRandomAmbientScare() {
     if (this.muted || isJumpscareActive) return;
 
+    const now = performance.now();
+
+    if (now - lastAmbientScareTime < 5200) {
+      return;
+    }
+
+    lastAmbientScareTime = now;
+
     const options = ["ambiente1", "ambiente2", "risada"];
     const selected = options[Math.floor(Math.random() * options.length)];
     const volume = selected === "risada"
-      ? 0.34 + Math.random() * 0.22
-      : 0.42 + Math.random() * 0.28;
+      ? 0.26 + Math.random() * 0.18
+      : 0.36 + Math.random() * 0.22;
 
-    this.playExtra(selected, volume);
+    this.playExtra(selected, volume, 5200);
   },
 
   playWallHitScare() {
@@ -447,7 +467,7 @@ randomScareSound(context = "default") {
   localStorage.setItem(SOUND_KEY, soundEnabled ? "true" : "false");
 
     if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(muted ? 0 : 0.62, this.ctx.currentTime, 0.12);
+      this.master.gain.setTargetAtTime(muted ? 0 : 0.80, this.ctx.currentTime, 0.12);
     }
   },
 
@@ -484,8 +504,8 @@ randomScareSound(context = "default") {
       const intensity = activeLevel.config.darkness + currentLevel * 0.035 + pressure * 0.38;
 
       if (Math.random() < intensity) {
-        const firstBeat = 0.055 + pressure * 0.085;
-        const secondBeat = 0.045 + pressure * 0.065;
+        const firstBeat = 0.095 + pressure * 0.13;
+        const secondBeat = 0.075 + pressure * 0.10;
 
         this.beep(52, 0.08, firstBeat, "sine");
         setTimeout(() => this.beep(47, 0.10, secondBeat, "sine"), 115);
@@ -632,6 +652,15 @@ function applyLevelSpecials(level) {
   }
 
   if (event === "movingWalls") {
+    const oppositeExitCell = { x: 1, y: 1 };
+
+    openCell(level.grid, oppositeExitCell.x, oppositeExitCell.y);
+    openCell(level.grid, oppositeExitCell.x + 1, oppositeExitCell.y);
+    openCell(level.grid, oppositeExitCell.x + 2, oppositeExitCell.y);
+    openCell(level.grid, oppositeExitCell.x, oppositeExitCell.y + 1);
+
+    level.exit = cellRect(oppositeExitCell.x, oppositeExitCell.y, tile);
+
     level.obstacles.push(
       movingObstacle(7, 7, "vertical", 0.85, 0.22, level),
       movingObstacle(15, 11, "horizontal", 0.95, 0.24, level),
@@ -720,13 +749,6 @@ function applyLevelSpecials(level) {
       movingObstacle(24, 14, "vertical", 0.75, 0.15, level)
     );
     level.triggers.push(
-      {
-        id: "final_mid",
-        rect: cellRect(13, 11, tile),
-        type: "hardJump",
-        image: "mid",
-        message: "Obrigado por me ensinar."
-      },
       {
         id: "final_near_exit",
         rect: cellRect(25, 3, tile),
@@ -1020,6 +1042,11 @@ function loadLevel(index) {
 
   saveGame();
 
+  if (index === levelConfigs.length - 1) {
+    saveGame({ completed: false });
+    showMessage("Fase 10 salva. Agora fuja.", 2200);
+  }
+
   requestAnimationFrame(() => {
     resizeCanvas();
     updateCamera();
@@ -1100,7 +1127,7 @@ function triggerShake() {
 }
 
 function triggerScreenBlink(intensity = 0.35, duration = 260, color = "white") {
-  if (!screenBlinkOverlay || isJumpscareActive) return;
+  if (!screenBlinkOverlay || isJumpscareActive || stageWrap.classList.contains("jumpscareActive")) return;
 
   const colors = {
     white: "rgba(255,255,255,0.72)",
@@ -1122,7 +1149,7 @@ function triggerScreenBlink(intensity = 0.35, duration = 260, color = "white") {
 }
 
 function triggerRedFlash(level = 1) {
-  if (!redFlashOverlay || isJumpscareActive) return;
+  if (!redFlashOverlay || isJumpscareActive || stageWrap.classList.contains("jumpscareActive")) return;
 
   const now = performance.now();
 
@@ -1154,7 +1181,7 @@ function spawnShadowInCameraRange() {
 
   const now = performance.now();
 
-  if (now - lastShadowTime < 4200) return;
+  if (now - lastShadowTime < 4800) return;
   lastShadowTime = now;
 
   const viewWidth = canvas.logicalWidth || stageWrap.clientWidth || 800;
@@ -1163,38 +1190,50 @@ function spawnShadowInCameraRange() {
   const playerScreenX = toScreenX(player.x + player.size / 2);
   const playerScreenY = toScreenY(player.y + player.size / 2);
 
-  let x;
-  let y;
-
   const side = Math.floor(Math.random() * 4);
-  const margin = 34;
+  const margin = 38;
+
+  let startX;
+  let startY;
+  let endX;
+  let endY;
 
   if (side === 0) {
-    x = margin + Math.random() * (viewWidth - margin * 2);
-    y = margin;
+    startX = -50;
+    startY = margin + Math.random() * (viewHeight - margin * 2);
+    endX = 90 + Math.random() * 140;
+    endY = startY + (Math.random() * 90 - 45);
   } else if (side === 1) {
-    x = viewWidth - margin - 34;
-    y = margin + Math.random() * (viewHeight - margin * 2);
+    startX = viewWidth + 50;
+    startY = margin + Math.random() * (viewHeight - margin * 2);
+    endX = viewWidth - 230 - Math.random() * 110;
+    endY = startY + (Math.random() * 90 - 45);
   } else if (side === 2) {
-    x = margin + Math.random() * (viewWidth - margin * 2);
-    y = viewHeight - margin - 64;
+    startX = margin + Math.random() * (viewWidth - margin * 2);
+    startY = -80;
+    endX = startX + (Math.random() * 120 - 60);
+    endY = 90 + Math.random() * 110;
   } else {
-    x = margin;
-    y = margin + Math.random() * (viewHeight - margin * 2);
+    startX = margin + Math.random() * (viewWidth - margin * 2);
+    startY = viewHeight + 80;
+    endX = startX + (Math.random() * 120 - 60);
+    endY = viewHeight - 210 - Math.random() * 90;
   }
 
-  const distanceFromPlayer = Math.hypot(x - playerScreenX, y - playerScreenY);
+  const distanceStart = Math.hypot(startX - playerScreenX, startY - playerScreenY);
+  const distanceEnd = Math.hypot(endX - playerScreenX, endY - playerScreenY);
 
-  if (distanceFromPlayer < 120) {
-    x = viewWidth - x;
-    y = viewHeight - y;
+  if (distanceStart < 110 || distanceEnd < 110) {
+    return;
   }
 
-  const duration = 420 + Math.random() * 520;
-  const opacity = 0.30 + Math.random() * 0.28;
+  const duration = 760 + Math.random() * 620;
+  const opacity = 0.34 + Math.random() * 0.22;
 
-  randomShadow.style.setProperty("--shadow-x", `${x}px`);
-  randomShadow.style.setProperty("--shadow-y", `${y}px`);
+  randomShadow.style.setProperty("--shadow-start-x", `${startX}px`);
+  randomShadow.style.setProperty("--shadow-start-y", `${startY}px`);
+  randomShadow.style.setProperty("--shadow-end-x", `${endX}px`);
+  randomShadow.style.setProperty("--shadow-end-y", `${endY}px`);
   randomShadow.style.setProperty("--shadow-duration", `${duration}ms`);
   randomShadow.style.setProperty("--shadow-opacity", String(opacity));
 
@@ -1204,7 +1243,7 @@ function spawnShadowInCameraRange() {
 
   setTimeout(() => {
     randomShadow.classList.remove("show");
-  }, duration + 60);
+  }, duration + 80);
 }
 
 function distanceToRect(px, py, rect) {
@@ -1276,7 +1315,7 @@ function updatePsychologicalEvents(now, dt) {
 
   audio.setDangerPressure(dangerPressure);
 
-  if (dangerPressure > 0.35 && now - lastAmbientScareTime > 2900) {
+  if (dangerPressure > 0.45 && now - lastAmbientScareTime > 5200) {
     lastAmbientScareTime = now;
 
     audio.playRandomAmbientScare();
@@ -1284,7 +1323,10 @@ function updatePsychologicalEvents(now, dt) {
     if (dangerPressure > 0.72) {
       triggerRedFlash(2);
       triggerScreenBlink(0.16, 140, "red");
-      showMessage(randomFrom(LORE_MESSAGES.near), 950);
+      if (now - lastNearDangerMessageTime > 6500) {
+        lastNearDangerMessageTime = now;
+        showMessage(randomFrom(LORE_MESSAGES.near), 950);
+      }
     } else {
       triggerRedFlash(1);
     }
@@ -1381,6 +1423,18 @@ function showJumpscare(duration = 650, callback, imageKey = "default") {
 
   isJumpscareActive = true;
 
+  stageWrap.classList.add("jumpscareActive");
+
+  if (redFlashOverlay) {
+    redFlashOverlay.classList.remove("active");
+    redFlashOverlay.style.display = "none";
+  }
+
+  if (screenBlinkOverlay) {
+    screenBlinkOverlay.classList.remove("active");
+    screenBlinkOverlay.style.display = "none";
+  }
+
   if (screenBlinkOverlay) {
     screenBlinkOverlay.classList.remove("active");
   }
@@ -1412,6 +1466,16 @@ function showJumpscare(duration = 650, callback, imageKey = "default") {
     screenNoise = 0;
     isJumpscareActive = false;
 
+    stageWrap.classList.remove("jumpscareActive");
+
+    if (redFlashOverlay) {
+      redFlashOverlay.style.display = "";
+    }
+
+    if (screenBlinkOverlay) {
+      screenBlinkOverlay.style.display = "";
+    }
+
     if (callback) {
       callback();
     }
@@ -1433,7 +1497,7 @@ function updatePlayer() {
   }
 
   if (dx !== 0 || dy !== 0) {
-    if (Math.random() < 0.035) audio.step();
+    if (Math.random() < 0.018) audio.step();
   }
 
   player.x += dx * player.speed;
@@ -1964,9 +2028,6 @@ function drawLights() {
 
   ctx.restore();
 
-  if (activeLevel.config.event === "fakeDifficulty") {
-    drawCornerEyes();
-  }
 }
 
 function drawCornerEyes() {
